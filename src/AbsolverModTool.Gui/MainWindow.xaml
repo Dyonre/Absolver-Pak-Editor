@@ -1,0 +1,154 @@
+﻿<Window x:Class="AbsolverModTool.Gui.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:local="clr-namespace:AbsolverModTool.Gui"
+        xmlns:av="clr-namespace:AbsolverViewer.Wpf;assembly=AbsolverViewer.Wpf"
+        Title="AbsolverModTool" Height="800" Width="1300">
+    <Window.Resources>
+        <local:InverseBooleanToVisibilityConverter x:Key="InverseBoolToVis"/>
+        <BooleanToVisibilityConverter x:Key="BoolToVis"/>
+    </Window.Resources>
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <ToolBar Grid.Row="0">
+            <Button x:Name="OpenFolderButton" Content="Open Folder..." Click="OpenFolder_Click"/>
+            <Button x:Name="ExtractGameButton" Content="Extract Game Files..." Click="ExtractGameFiles_Click"
+                    ToolTip="Extract the installed base game into an empty folder for the Data Editor"/>
+            <Button x:Name="LoadModPakButton" Content="Load Mod Pak..." Click="LoadModPak_Click"
+                    ToolTip="Look inside a mod pak, then extract it into an editable local copy"/>
+            <Separator/>
+            <Menu Background="Transparent">
+                <MenuItem Header="Rows">
+                    <MenuItem x:Name="CloneRowMenuItem" Header="Clone Row..." Click="CloneRow_Click" IsEnabled="False"/>
+                    <MenuItem x:Name="AddSlotMenuItem" Header="Add Slot..." Click="AddSlot_Click" IsEnabled="False"/>
+                    <MenuItem x:Name="RemoveSlotMenuItem" Header="Remove Slot..." Click="RemoveSlot_Click" IsEnabled="False"/>
+                    <MenuItem x:Name="RemoveRowMenuItem" Header="Remove Row..." Click="RemoveRow_Click" IsEnabled="False"/>
+                </MenuItem>
+                <MenuItem Header="Recipe">
+                    <MenuItem Header="New Recipe" Click="NewRecipe_Click"/>
+                    <MenuItem Header="Save Recipe..." Click="SaveRecipe_Click"/>
+                    <MenuItem Header="Load Recipe..." Click="LoadRecipe_Click"/>
+                </MenuItem>
+            </Menu>
+            <Separator/>
+            <Button x:Name="PreviewDiffButton" Content="Preview Diff" Click="PreviewDiff_Click"/>
+            <Button x:Name="FinalizeButton" Content="Finalize..." Click="Finalize_Click"/>
+            <Separator/>
+            <Button x:Name="InstalledModsButton" Content="Installed Mods..." Click="InstalledMods_Click"/>
+            <Button x:Name="SettingsButton" Content="Settings..." Click="Settings_Click"/>
+        </ToolBar>
+
+        <TabControl x:Name="MainTabs" Grid.Row="1" SelectionChanged="MainTabs_SelectionChanged">
+            <TabItem Header="Data Editor">
+        <Grid>
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="320"/>
+                <ColumnDefinition Width="*"/>
+            </Grid.ColumnDefinitions>
+
+            <TreeView x:Name="AssetTree" Grid.Column="0" Margin="4"
+                      SelectedItemChanged="AssetTree_SelectedItemChanged"/>
+
+            <Grid Grid.Column="1" Margin="4,4,4,0">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="*"/>
+                </Grid.RowDefinitions>
+
+                <DockPanel Grid.Row="0" Margin="0,0,0,4" LastChildFill="False">
+                    <TextBlock x:Name="AssetLabel" Text="(no asset selected)" VerticalAlignment="Center" FontWeight="Bold"/>
+                    <TextBlock Text="Row:" VerticalAlignment="Center" Margin="16,0,4,0" DockPanel.Dock="Left"/>
+                    <ComboBox x:Name="RowSelector" Width="220" DockPanel.Dock="Left"
+                              SelectionChanged="RowSelector_SelectionChanged" IsEnabled="False"/>
+                    <Border x:Name="IconPreviewBorder" DockPanel.Dock="Right" Width="48" Height="48"
+                            BorderBrush="Gray" BorderThickness="1" Margin="8,0,0,0" Visibility="Collapsed"
+                            ToolTip="The first icon/picto texture reference found on this row (m_AttackPicto, m_InventoryIcon, etc.) - only shown when it's an uncompressed, inline texture this tool can decode.">
+                        <Image x:Name="IconPreviewImage" Stretch="Uniform" RenderOptions.BitmapScalingMode="NearestNeighbor"/>
+                    </Border>
+                    <TextBlock x:Name="IconPreviewText" DockPanel.Dock="Right" VerticalAlignment="Center"
+                               Margin="0,0,8,0" Foreground="Gray" FontSize="10" MaxWidth="220" TextWrapping="Wrap"/>
+                </DockPanel>
+
+                <DataGrid x:Name="FieldGrid" Grid.Row="1" AutoGenerateColumns="False" CanUserAddRows="False"
+                          CanUserDeleteRows="False" RowHeaderWidth="0"
+                          BeginningEdit="FieldGrid_BeginningEdit" CellEditEnding="FieldGrid_CellEditEnding">
+                    <DataGrid.Columns>
+                        <DataGridTextColumn Header="Name" Binding="{Binding Name}" IsReadOnly="True" Width="260"/>
+                        <DataGridTextColumn Header="Type" Binding="{Binding PropertyType}" IsReadOnly="True" Width="150"/>
+                        <DataGridTemplateColumn Header="Value" Width="*">
+                            <DataGridTemplateColumn.CellTemplate>
+                                <DataTemplate>
+                                    <TextBlock Text="{Binding Value}" Padding="4,2" VerticalAlignment="Center"/>
+                                </DataTemplate>
+                            </DataGridTemplateColumn.CellTemplate>
+                            <DataGridTemplateColumn.CellEditingTemplate>
+                                <DataTemplate>
+                                    <Grid>
+                                        <TextBox Text="{Binding Value, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                                 Visibility="{Binding HasAttackChoices, Converter={StaticResource InverseBoolToVis}}"/>
+                                        <ComboBox ItemsSource="{Binding AttackChoices}"
+                                                  DisplayMemberPath="DisplayText" SelectedValuePath="Key"
+                                                  SelectedValue="{Binding Value, Mode=TwoWay}"
+                                                  SelectionChanged="AttackPickerCombo_SelectionChanged"
+                                                  DropDownClosed="AttackPickerCombo_DropDownClosed"
+                                                  Visibility="{Binding HasAttackChoices, Converter={StaticResource BoolToVis}}"/>
+                                    </Grid>
+                                </DataTemplate>
+                            </DataGridTemplateColumn.CellEditingTemplate>
+                        </DataGridTemplateColumn>
+                        <DataGridTextColumn x:Name="ResolvedColumn" Header="Resolved" Binding="{Binding Resolved}" IsReadOnly="True" Width="200"/>
+                    </DataGrid.Columns>
+                </DataGrid>
+            </Grid>
+        </Grid>
+
+            </TabItem>
+            <TabItem Header="Animation Viewer" x:Name="AnimTab">
+                <DockPanel>
+                    <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Margin="6,4">
+                        <Button Content="Reload from paks" Padding="8,2" Click="ReloadPaks_Click"
+                                ToolTip="Re-mounts the game's Paks folder (base + installed mod paks) and reloads the viewer"/>
+                        <Button Content="Add pak..." Padding="8,2" Margin="8,0,0,0" Click="AddPak_Click"
+                                ToolTip="Pick a .pak anywhere on disk, look through its moves and files first, then load it on top of the game's paks"/>
+                        <TextBlock x:Name="AnimStatus" Margin="12,0,0,0" VerticalAlignment="Center" Foreground="Gray"
+                                   Text="Edits made in the Data Editor (attacks table) show here live - no reload needed."/>
+                    </StackPanel>
+                    <av:AnimationViewerControl x:Name="AnimViewer"/>
+                </DockPanel>
+            </TabItem>
+        </TabControl>
+
+        <Grid Grid.Row="2" Height="220">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition x:Name="ConsoleColumn" Width="*"/>
+                <ColumnDefinition x:Name="PendingEditsColumn" Width="260"/>
+                <ColumnDefinition x:Name="VerifyColumn" Width="260"/>
+            </Grid.ColumnDefinitions>
+
+            <GroupBox x:Name="ConsoleGroupBox" Header="Console" Grid.Column="0" Margin="4">
+                <DockPanel>
+                    <Button Content="Copy Log" DockPanel.Dock="Bottom" Margin="0,4,0,0" Click="CopyLog_Click"/>
+                    <TextBox x:Name="ConsoleBox" IsReadOnly="True" FontFamily="Consolas" FontSize="11"
+                             VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto"
+                             TextWrapping="NoWrap"/>
+                </DockPanel>
+            </GroupBox>
+
+            <GroupBox x:Name="PendingEditsGroupBox" Header="Pending Edits" Grid.Column="1" Margin="4">
+                <DockPanel>
+                    <Button Content="Remove Selected" DockPanel.Dock="Bottom" Margin="0,4,0,0" Click="RemovePendingEdit_Click"/>
+                    <ListBox x:Name="PendingEditsList" KeyDown="PendingEditsList_KeyDown"/>
+                </DockPanel>
+            </GroupBox>
+
+            <GroupBox x:Name="VerifyGroupBox" Header="Verify" Grid.Column="2" Margin="4">
+                <ListBox x:Name="VerifyList"/>
+            </GroupBox>
+        </Grid>
+    </Grid>
+</Window>

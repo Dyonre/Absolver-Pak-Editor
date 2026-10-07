@@ -1,0 +1,14 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Reads Absolver's .pak files directly (CUE4Parse) and produces the JSON the three.js viewer in ../../viewer consumes:
+       skeleton, per-move animations, the player mesh, and the move list from the attacks table. Mod paks mounted in the same
+       folder (Absolver Plus, zzzSifuMoves, ...) take part, so edited/new rows show up without any export step. -->
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="CUE4Parse" Version="1.2.2" />
+    <PackageReference Include="CUE4Parse-Conversion" Version="1.2.1" />
+  </ItemGroup>
+</Project>

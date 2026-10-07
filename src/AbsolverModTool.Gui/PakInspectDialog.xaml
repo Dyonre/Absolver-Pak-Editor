@@ -1,0 +1,59 @@
+<Window x:Class="AbsolverModTool.Gui.PakInspectDialog"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Look inside a pak" Width="900" Height="640" WindowStartupLocation="CenterOwner" ShowInTaskbar="False">
+    <DockPanel Margin="10">
+        <StackPanel DockPanel.Dock="Top" Margin="0,0,0,8">
+            <TextBlock x:Name="TitleText" FontSize="16" FontWeight="SemiBold"/>
+            <TextBlock x:Name="SummaryText" Foreground="Gray" Margin="0,2,0,0" TextWrapping="Wrap"/>
+            <TextBlock x:Name="NoteText" Foreground="DarkOrange" Margin="0,4,0,0" TextWrapping="Wrap"/>
+        </StackPanel>
+
+        <DockPanel DockPanel.Dock="Bottom" Margin="0,10,0,0" LastChildFill="False">
+            <TextBlock x:Name="StateText" DockPanel.Dock="Left" VerticalAlignment="Center" Foreground="Gray"/>
+            <Button DockPanel.Dock="Right" Content="Close" Width="80" IsCancel="True" Margin="8,0,0,0" Click="Close_Click"/>
+            <Button x:Name="EditButton" DockPanel.Dock="Right" Content="Open for editing" Width="130" Margin="8,0,0,0" Click="Edit_Click"
+                    ToolTip="Extracts this pak into the tool's work folder, then opens its assets in the Data Editor. Your edits are packed as a new override pak."/>
+            <Button x:Name="LoadButton" DockPanel.Dock="Right" Content="Load into viewer" Width="140" IsDefault="True" Click="Load_Click"
+                    ToolTip="Mounts this pak on top of the game's paks, so its moves and animations show up in the Animation Viewer (and override the same paths)"/>
+        </DockPanel>
+
+        <TabControl>
+            <TabItem Header="Moves in this pak">
+                <DockPanel Margin="6">
+                    <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Margin="0,0,0,6">
+                        <TextBlock Text="Show" VerticalAlignment="Center"/>
+                        <ComboBox x:Name="StatusFilter" Width="150" Margin="6,0,12,0" SelectionChanged="Filter_Changed">
+                            <ComboBoxItem Content="New + changed" IsSelected="True"/>
+                            <ComboBoxItem Content="New only"/>
+                            <ComboBoxItem Content="Changed only"/>
+                            <ComboBoxItem Content="Everything"/>
+                        </ComboBox>
+                        <TextBox x:Name="MoveSearch" Width="220" TextChanged="Filter_Changed" ToolTip="Search id, name or animation"/>
+                        <TextBlock x:Name="MoveCount" Margin="12,0,0,0" VerticalAlignment="Center" Foreground="Gray"/>
+                    </StackPanel>
+                    <ListView x:Name="MoveList">
+                        <ListView.View>
+                            <GridView>
+                                <GridViewColumn Header="Id" Width="70" DisplayMemberBinding="{Binding Id}"/>
+                                <GridViewColumn Header="Name" Width="200" DisplayMemberBinding="{Binding Name}"/>
+                                <GridViewColumn Header="vs base game" Width="100" DisplayMemberBinding="{Binding Status}"/>
+                                <GridViewColumn Header="Animation" Width="380" DisplayMemberBinding="{Binding Anim}"/>
+                                <GridViewColumn Header="Animation in this pak" Width="130" DisplayMemberBinding="{Binding AnimText}"/>
+                            </GridView>
+                        </ListView.View>
+                    </ListView>
+                </DockPanel>
+            </TabItem>
+            <TabItem Header="All files">
+                <DockPanel Margin="6">
+                    <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Margin="0,0,0,6">
+                        <TextBox x:Name="FileSearch" Width="300" TextChanged="FileSearch_Changed" ToolTip="Search paths (e.g. Animations, .uasset, Custom)"/>
+                        <TextBlock x:Name="FileCount" Margin="12,0,0,0" VerticalAlignment="Center" Foreground="Gray"/>
+                    </StackPanel>
+                    <ListBox x:Name="FileList" FontFamily="Consolas"/>
+                </DockPanel>
+            </TabItem>
+        </TabControl>
+    </DockPanel>
+</Window>

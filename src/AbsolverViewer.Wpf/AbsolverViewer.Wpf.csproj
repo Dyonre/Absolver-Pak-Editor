@@ -1,0 +1,18 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Shared WebView2 host for the move/animation viewer (../../viewer).
+       The page itself (not viewer/data, which is exported game content) is compiled in, so a release needs no loose viewer folder. -->
+  <PropertyGroup>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <UseWPF>true</UseWPF>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Web.WebView2" Version="1.0.2792.45" />
+  </ItemGroup>
+  <ItemGroup>
+    <EmbeddedResource Include="..\..\viewer\index.html" LogicalName="viewer/index.html" />
+    <EmbeddedResource Include="..\..\viewer\viewer.js" LogicalName="viewer/viewer.js" />
+    <EmbeddedResource Include="..\..\viewer\three.min.js" LogicalName="viewer/three.min.js" />
+  </ItemGroup>
+</Project>

@@ -1,0 +1,519 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Absolver Move Viewer (test copy)</title>
+<style>
+  :root { --bg:#11111b; --panel:#181825; --line:#313244; --text:#cdd6f4; --dim:#7f849c; --acc:#89b4fa; --ok:#a6e3a1; --bad:#f38ba8; --warn:#f9e2af; }
+  * { box-sizing:border-box; margin:0; padding:0; }
+  body { background:var(--bg); color:var(--text); font:13px 'Segoe UI',sans-serif; height:100vh; display:grid;
+         grid-template-columns:330px 1fr; grid-template-rows:1fr auto; overflow:hidden; }
+  #left { grid-row:1/3; background:var(--panel); border-right:1px solid var(--line); display:flex; flex-direction:column; min-height:0; }
+  #filters { padding:8px; display:flex; flex-direction:column; gap:6px; border-bottom:1px solid var(--line); }
+  #filters input,#filters select { background:var(--bg); color:var(--text); border:1px solid var(--line); border-radius:4px; padding:5px 7px; }
+  #filters .row { display:flex; gap:6px; } #filters .row>* { flex:1; min-width:0; }
+  #list { overflow:auto; flex:1; }
+  .mv { padding:6px 10px; border-bottom:1px solid #20202e; cursor:pointer; display:flex; gap:8px; align-items:center; }
+  .mv:hover { background:#242436; } .mv.sel { background:#2b3350; }
+  .mv .nm { flex:1; min-width:0; } .mv .nm b { font-weight:600; } .mv .nm small { display:block; color:var(--dim); font-size:11px; }
+  .st { font:600 11px monospace; color:var(--acc); white-space:nowrap; }
+  #main { position:relative; min-height:0; min-width:0; }
+  #container { position:absolute; inset:0; }
+  #hud { position:absolute; top:10px; left:12px; right:12px; pointer-events:none; display:flex; justify-content:space-between; gap:12px; z-index:5; }
+  #hud .t { font-size:16px; font-weight:600; } #hud .s { color:var(--dim); font-size:12px; margin-top:2px; }
+  #hud .btns { pointer-events:auto; display:flex; gap:10px; align-items:center; color:var(--dim); font-size:12px; }
+  #info,#no-data,#error-overlay { position:absolute; z-index:4; } #info { left:12px; bottom:6px; color:var(--dim); font-size:11px; }
+  #no-data { top:50%; left:50%; transform:translate(-50%,-50%); color:#45475a; text-align:center; }
+  #error-overlay { top:50%; left:50%; transform:translate(-50%,-50%); color:var(--bad); text-align:center; }
+  #dock { background:var(--panel); border-top:1px solid var(--line); padding:8px 12px 10px; display:flex; flex-direction:column; gap:8px; }
+  #bar { position:relative; height:46px; background:var(--bg); border:1px solid var(--line); border-radius:4px; cursor:pointer; overflow:hidden; }
+  .seg { position:absolute; top:0; bottom:0; border-right:1px solid #000a; } .seg .su { position:absolute; left:0; top:0; bottom:0; background:#f9e2af44; }
+  .ph { position:absolute; top:0; bottom:50%; opacity:.6; } .ph-build{background:#f9e2af} .ph-strike{background:#f38ba8; opacity:.85} .ph-inter{background:#fab387}
+  .ph-release{background:#89b4fa} .ph-intr{background:#74c7ec} .ph-perfect{top:auto; height:5px; background:#a6e3a1; opacity:1}
+  .nt { position:absolute; top:50%; bottom:0; min-width:2px; opacity:.8; border-left:1px solid #fff4; }
+  .nt-build{background:#f9e2af} .nt-strike{background:#f38ba8} .nt-inter{background:#fab387} .nt-release{background:#89b4fa} .nt-intr{background:#74c7ec}
+  .nt-perfect{background:#a6e3a1} .nt-cancel{background:#fff; min-width:3px} .nt-fx{background:#cba6f7} .nt-snd{background:#6c7086} .nt-other{background:#585b70}
+  .nt.tick { top:62%; bottom:0; } .lane-l { position:absolute; left:3px; font-size:9px; color:#cdd6f4aa; pointer-events:none; z-index:2 }
+  #sync { font-size:12px; margin-top:3px; max-width:560px; } #sync.ok{color:var(--ok)} #sync.warn{color:var(--warn)}
+  #edit { position:absolute; top:84px; right:12px; width:270px; max-height:calc(100% - 130px); overflow:auto; z-index:6; background:#181825ee; border:1px solid var(--line); border-radius:6px; padding:8px 10px; display:none; }
+  #edit h4 { font-size:11px; color:var(--dim); text-transform:uppercase; letter-spacing:.06em; margin:8px 0 4px; }
+  #edit .f { display:flex; align-items:center; gap:6px; margin:2px 0; } #edit .f label { flex:1; font-size:12px; }
+  #edit input[type=number], #edit select, #edit input[type=text] { width:92px; background:var(--bg); color:var(--text); border:1px solid var(--line); border-radius:4px; padding:2px 5px; font:inherit; }
+  #edit input[type=text] { width:150px; } #edit .f.chg label { color:var(--warn); }
+  #edit .note { font-size:11px; color:var(--dim); margin-top:6px; }
+  .badge { display:inline-block; font:600 10px sans-serif; padding:1px 6px; border-radius:8px; background:#45475a; color:#cdd6f4; margin-right:4px }
+  #src { position:absolute; left:12px; bottom:22px; font-size:11px; color:var(--dim); z-index:4 }
+  .seg span { position:absolute; left:4px; top:5px; font-size:11px; color:var(--text); white-space:nowrap; pointer-events:none; }
+  #head { position:absolute; top:0; bottom:0; width:2px; background:var(--bad); pointer-events:none; }
+  #ctl { display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
+  button { background:#2a2a3d; color:var(--text); border:1px solid var(--line); border-radius:4px; padding:4px 10px; cursor:pointer; font:inherit; }
+  button:hover { background:#34344d; } button.pri { background:#3b4f86; border-color:#4d65a8; }
+  #chain { display:flex; gap:6px; flex-wrap:wrap; align-items:center; min-height:42px; }
+  .chip { border:1px solid var(--line); background:var(--bg); border-radius:6px; padding:3px 8px; display:flex; gap:6px; align-items:center; cursor:pointer; }
+  .chip.bad { border-color:var(--bad); } .chip.cur { outline:2px solid var(--acc); } .chip .x { color:var(--dim); } .chip .x:hover { color:var(--bad); }
+  .dim { color:var(--dim); } #fd { font:12px monospace; color:var(--warn); }
+  input[type=range] { accent-color:var(--acc); }
+</style>
+</head>
+<body>
+<aside id="left">
+  <div id="filters">
+    <input id="q" placeholder="Search name / id / animation...">
+    <div class="row">
+      <select id="wp"><option value="">Any weapon</option><option value="WithBareHands">Bare-Hands</option><option value="WithSword">Sword</option><option value="WithWarGloves">Wargloves</option></select>
+      <select id="sq"><option value="">Any start</option><option>FR</option><option>FL</option><option>BR</option><option>BL</option></select>
+      <select id="eq"><option value="">Any end</option><option>FR</option><option>FL</option><option>BR</option><option>BL</option></select>
+    </div>
+    <select id="srcf" style="display:none"><option value="">Any source</option></select>
+    <div class="dim" id="cnt"></div>
+  </div>
+  <div id="list"></div>
+</aside>
+
+<section id="main">
+  <div id="container"></div>
+  <div id="hud">
+    <div><div class="t" id="mt">Pick a move</div><div class="s" id="ms"></div><div id="fd"></div><div id="sync"></div></div>
+    <div class="btns">
+      <label><input type="checkbox" id="skel" checked> skeleton</label>
+      <label><input type="checkbox" id="mesh" checked> mesh</label>
+      <button id="editb" title="edit the selected move's attacks-row values and watch the timeline change">Edit move</button>
+      <label title="F"><input type="checkbox" id="follow" checked> follow</label>
+      <label>root <select id="rm"><option value="accum">accumulate</option><option value="inplace">in place</option></select></label>
+      <label>weapon <select id="wpn"><option>None</option><option>Gloves</option><option>Sword</option></select></label>
+      <label>speed <input type="range" id="spd" min="0.1" max="2" step="0.05" value="1" style="width:90px"></label>
+      <button onclick="resetCamera()">reset cam</button>
+    </div>
+  </div>
+  <div id="edit"></div>
+  <div id="info"></div>
+  <div id="src"></div>
+  <div id="help" style="position:absolute;right:12px;bottom:6px;color:var(--dim);font-size:11px;z-index:4;pointer-events:none">MMB orbit · Shift+MMB pan · Ctrl+MMB / wheel zoom · LMB orbit · RMB pan · 1/3/7 views · R reset · F follow</div>
+  <div id="no-data"><div style="font-size:48px">&#9760;</div>Select a move to preview it</div>
+  <div id="error-overlay" style="display:none"><div style="font-size:48px">&#9888;</div><div id="error-text"></div></div>
+</section>
+
+<footer id="dock">
+  <div id="bar"><div id="head"></div></div>
+  <div id="ctl">
+    <button id="pp" class="pri">Pause</button>
+    <button id="addb">+ Add selected to chain</button>
+    <button id="playc" class="pri">Play chain</button>
+    <button id="clr">Clear chain</button>
+    <span class="dim" id="chmsg"></span>
+  </div>
+  <div id="chain"></div>
+</footer>
+
+<script src="three.min.js"></script>
+<script src="viewer.js"></script>
+<script>
+const Q = { FrontRight:'FR', FrontLeft:'FL', BackRight:'BR', BackLeft:'BL' };
+const $ = id => document.getElementById(id);
+let cameraDone = false, moves = [], skeleton = null, sel = null, chain = [], mode = 'solo';   // mode: solo | chain
+let segs = [], total = 0, playing = true;
+const cache = {};
+const short = q => Q[q] || q;
+const arrow = m => `${short(m.StartQuadrant)}→${short(m.EndQuadrant)}`;
+
+const LIVE = new URLSearchParams(location.search).has('static') ? null : (window.__liveBase || null);   // set by the WPF host: reads paks directly (see AbsolverViewer.Paks)
+const strip = v => (v == null ? '' : String(v).split('::').pop());
+const bool = v => v === true || /^true$/i.test(String(v));
+async function getAnim(m) {
+  const key = (LIVE ? 'L:' : 'S:') + (m.AnimPath || m.Anim);
+  if (!cache[key]) {
+    const url = LIVE && m.AnimPath ? `${LIVE}anim?p=${encodeURIComponent(m.AnimPath)}` : `data/${m.Anim}.json`;
+    cache[key] = fetch(url).then(r => { if (!r.ok) throw new Error(`${m.AnimPath || m.Anim}: HTTP ${r.status} (animation not found in the paks)`); return r.json(); }).catch(e => { delete cache[key]; throw e; });
+  }
+  return cache[key];
+}
+
+// attacks-table row (raw property names, from the pak reader or the property grid) -> viewer move object
+function rowToMove(id, r, orig) {
+  const n = k => +r[k] || 0, strikes = [], inter = [];
+  for (let i = 1; i <= 4; i++) { const v = n('m_iFrameStrike' + i); if (v > 0) strikes.push(v); }
+  for (let i = 1; i <= 3; i++) inter.push(n('m_iFrameInterStrike' + i));
+  const anim = r.m_Anim && r.m_Anim !== 'None' ? String(r.m_Anim) : null;
+  const m = {
+    Raw: r, Id: id, Name: r.m_RealAttackName || id, StartQuadrant: strip(r.m_eStartQuadrant), EndQuadrant: strip(r.m_eEndQuadrant),
+    WithBareHands: bool(r.m_bWithBareHands), WithSword: bool(r.m_bWithSword), WithWarGloves: bool(r.m_bWithWarGloves),
+    XpToUnlock: n('m_iXPRequiredToUnlock'), Startup: n('m_iFrameBuildUp'), HitAdv: n('m_iAdvFrameOnPLHit'), GuardAdv: n('m_iAdvFrameOnPLGuard'),
+    HitTarget: strip(r.m_eHitTarget), MovementType: strip(r.m_eMovementType1), Side: /left/i.test(r.m_eWeaponSlotAttacking1 || '') ? 'Left' : 'Right',
+    AnimPath: anim, Anim: anim ? anim.split('/').pop().split('.')[0] : null,
+    F: { build: n('m_iFrameBuildUp'), strikes, inter, release: n('m_iFrameRelease'), interruptible: n('m_iFrameInterruptibleRelease'),
+         perfect: n('m_iFramePerfectRelease'), perfectWin: n('m_iNbFramesPerfectRelease'), cancel: n('m_iFrameCancel') },
+    Mods: [bool(r.m_bIsInterruptAttack) && 'Interrupt', bool(r.m_bCanGuardBreak) && 'Guard break', bool(r.m_bIsDisarmAttack) && 'Disarm',
+           bool(r.m_bIsRushAttack) && 'Rush', bool(r.m_bIsSpecialAbilityAttack) && 'Special ability', bool(r.m_bIsDrunkenAttack) && 'Drunken',
+           /heavy|strong/i.test(strip(r.m_eAttackPower)) && strip(r.m_eAttackPower)].filter(Boolean),
+  };
+  m.Orig = orig || m.F;   // timeline of the row as first loaded = what the animation's notifies were authored for
+  return m;
+}
+
+// Mirror of AnimRetime (C#): move the animation's phase notifies by however far the row's boundaries moved. The pak keeps the
+// vanilla notifies; this only changes what the viewer draws, the mod tool does the real retime at pack time (retime-anim edit).
+function frameBounds(F, n) {
+  const b = { buildEnd: F.build }; let cur = F.build;
+  for (let i = 0; i < n; i++) { b['s' + i + 'a'] = cur; cur += F.strikes[i]; b['s' + i + 'b'] = cur; if (i < n - 1) cur += F.inter[i] || 0; }
+  b.relA = cur; b.relB = cur + F.release + F.interruptible; b.perfA = cur + F.perfect; b.perfB = cur + F.perfect + F.perfectWin;
+  b.intrA = cur + F.release; b.intrB = cur + F.release + F.interruptible;
+  return b;
+}
+function retimeNotifies(nts, o, e, clipLen) {
+  if (!o || !e) return nts;
+  const by = nm => nts.filter(x => x.state && x.name === nm).sort((a, b) => a.t - b.t);
+  const build = by('Phase : BuildUp')[0], st = by('Phase : Strike'), rel = by('Phase : Release')[0], pf = by('A.L : Perfect release')[0], it = by('A.L : interruptible release')[0];
+  if (!build || !rel || !st.length || st.length !== e.strikes.length || o.strikes.length !== e.strikes.length) return nts;   // can't pair: leave as authored
+  const E = frameBounds(e, st.length), O = frameBounds(o, st.length), D = k => (E[k] - O[k]) / 30, pr = [[0, 0]];
+  const P = (d, k) => pr.push([d, d + D(k)]);
+  P(build.t + build.d, 'buildEnd');
+  st.forEach((x, i) => { P(x.t, 's' + i + 'a'); P(x.t + x.d, 's' + i + 'b'); });
+  P(rel.t, 'relA'); P(rel.t + rel.d, 'relB');
+  if (pf) { P(pf.t, 'perfA'); P(pf.t + pf.d, 'perfB'); }
+  if (it) { P(it.t, 'intrA'); P(it.t + it.d, 'intrB'); }
+  const ld = Math.max(clipLen, ...pr.map(x => x[0])), lt = Math.max(clipLen, ...pr.map(x => x[1])); pr.push([ld, lt]);
+  pr.sort((a, b) => a[0] - b[0] || a[1] - b[1]);
+  const d = pr.map(x => x[0]), t = []; pr.forEach((x, i) => t.push(i ? Math.max(x[1], t[i - 1]) : Math.max(0, x[1])));
+  const map = v => { if (v <= d[0]) return t[0]; for (let i = 1; i < d.length; i++) { if (v > d[i]) continue; const sp = d[i] - d[i - 1], f = sp <= 0 ? 1 : (v - d[i - 1]) / sp; return t[i - 1] + f * (t[i] - t[i - 1]); } return t[t.length - 1]; };
+  return nts.map(n => { const a = map(n.t), b = map(n.t + n.d); return { ...n, t: a, d: n.d > 0 ? b - a : 0 }; });
+}
+
+// Phase timeline (frames @30) straight from the row: BuildUp, Strike(s) with InterStrike gaps, then Release + interruptible release
+// (docs/attack-row-and-notify-map.md).
+function phases(m) {
+  const F = m.F; if (!F) return { list: [{ k: 'build', a: 0, b: m.Startup }], end: m.Startup };
+  const list = [{ k: 'build', a: 0, b: F.build }]; let t = F.build;
+  F.strikes.forEach((st, i) => {
+    list.push({ k: 'strike', a: t, b: t + st }); t += st;
+    if (i < F.strikes.length - 1) { const g = F.inter[i] || 0; if (g) list.push({ k: 'inter', a: t, b: t + g }); t += g; }
+  });
+  list.push({ k: 'release', a: t, b: t + F.release }, { k: 'intr', a: t + F.release, b: t + F.release + F.interruptible });
+  if (F.perfectWin > 0) list.push({ k: 'perfect', a: t + F.perfect, b: t + F.perfect + F.perfectWin });
+  return { list, end: t + F.release + F.interruptible };
+}
+
+const fr = sec => Math.round(sec * 30);
+const retimeOn = () => { const c = $('retime'); return !c || c.checked; };
+function nkind(n) {
+  const nm = n.name || '';
+  if (nm === 'Phase : BuildUp') return 'build'; if (nm === 'Phase : Strike') return 'strike'; if (nm === 'Phase : InterStrike') return 'inter';
+  if (nm === 'Phase : Release') return 'release'; if (nm === 'A.L : interruptible release') return 'intr'; if (nm === 'A.L : Perfect release') return 'perfect';
+  if (/^CancelNotify|^BlendOut/.test(nm)) return 'cancel';
+  if (/PlayFX|^P_|Trail|Particle/i.test(nm + ' ' + (n.cls || ''))) return 'fx';
+  if (/AkEvent|Sound/i.test(nm + ' ' + (n.cls || ''))) return 'snd';
+  return 'other';
+}
+// Does the move's row timeline equal the animation's baked Phase notifies? (Both exist; docs/attack-row-and-notify-map.md.)
+function syncReport(m, notifies) {
+  if (!notifies || !m.F) return null;
+  const by = k => notifies.filter(n => n.state && nkind(n) === k).sort((a, b) => a.t - b.t);
+  const diffs = [], F = m.F;
+  const b = by('build')[0], st = by('strike'), rl = by('release')[0];
+  if (b && fr(b.d) !== F.build) diffs.push(`build-up ${F.build}f in row, ${fr(b.d)}f in animation`);
+  const rs = F.strikes.join('+') || '-', as = st.map(x => fr(x.d)).join('+') || '-';
+  if (rs !== as) diffs.push(`strikes ${rs}f in row, ${as}f in animation`);
+  if (rl && fr(rl.d) !== F.release + F.interruptible) diffs.push(`release ${F.release + F.interruptible}f in row, ${fr(rl.d)}f in animation`);
+  return diffs;
+}
+function showSync(m, sg) {
+  const el = $('sync'); const d = sg && syncReport(m, sg.notifies);
+  if (!sg || d == null) { el.className = ''; el.textContent = ''; return; }
+  if (!d.length) { el.className = 'ok'; el.textContent = 'row timing = animation notifies (hitbox windows agree)' + (m.Orig && JSON.stringify(m.Orig) !== JSON.stringify(m.F) ? ' - shown retimed; packing applies the same retime to the animation' : ''); return; }
+  el.className = 'warn';
+  el.textContent = 'row differs from the animation\'s baked notifies: ' + d.join('; ') + '. Turn on "Retime with the row" (Edit move panel) so packing moves the animation\'s notifies too.';
+}
+
+function badges(m) { return (m.Mods || []).map(x => `<span class="badge">${x}</span>`).join(''); }
+function frameLine(m) {
+  return `startup ${m.Startup}f · hit adv ${m.HitAdv>=0?'+':''}${m.HitAdv} · guard adv ${m.GuardAdv>=0?'+':''}${m.GuardAdv} · ${m.HitTarget} ${m.MovementType} · ${m.Side}`;
+}
+
+// ---- list ----
+const srcMatch = m => { const v = $('srcf').value; return !v || (v === '*mods' ? (m.Status && m.Status !== 'base') : (v === '*new' ? m.Status === 'new' : (v === '*changed' ? m.Status === 'changed' : m.Src === v))); };
+function fillSources() {   // source filter appears only when moves come from more than the base game
+  const f = $('srcf'), mods = moves.filter(m => m.Status && m.Status !== 'base');
+  if (!mods.length) { f.style.display = 'none'; return; }
+  const keep = f.value, names = [...new Set(mods.map(m => m.Src))].sort();
+  f.innerHTML = '<option value="">Any source</option><option value="*mods">All mod moves (' + mods.length + ')</option><option value="*new">New moves only</option><option value="*changed">Changed moves only</option>'
+    + names.map(n => `<option value="${n}">${n}</option>`).join('');
+  f.value = [...f.options].some(o => o.value === keep) ? keep : ''; f.style.display = '';
+}
+function renderList() {
+  const q = $('q').value.toLowerCase(), wp = $('wp').value, sq = $('sq').value, eq = $('eq').value;
+  const rows = moves.filter(m => (!q || `${m.Name} ${m.Id} ${m.Anim}`.toLowerCase().includes(q)) && (!wp || m[wp]) && (!sq || short(m.StartQuadrant) === sq) && (!eq || short(m.EndQuadrant) === eq) && srcMatch(m));
+  $('cnt').textContent = `${rows.length} / ${moves.length} moves`;
+  $('list').innerHTML = '';
+  for (const m of rows) {
+    const d = document.createElement('div'); d.className = 'mv' + (sel === m ? ' sel' : '');
+    d.innerHTML = `<div class="nm"><b>${m.Name}</b><small>${m.Id} · ${m.Anim}${m.Status && m.Status !== 'base' ? ` · <span class="badge" style="background:${m.Status === 'new' ? '#2f6b45' : '#7a5c1e'}">${m.Status}</span> ${m.Src}` : ''}</small></div><div class="st">${arrow(m)}</div>`;
+    d.onclick = () => select(m); d.ondblclick = () => addToChain(m);
+    $('list').appendChild(d);
+  }
+}
+
+// ---- playback ----
+const BLEND = 3;   // frames of pose blend at each join
+function slerp(a, b, t) {
+  let d = a.x*b.x + a.y*b.y + a.z*b.z + a.w*b.w, s = d < 0 ? -1 : 1; d *= s;
+  if (d > 0.9995) { const r = { x: a.x + t*(s*b.x - a.x), y: a.y + t*(s*b.y - a.y), z: a.z + t*(s*b.z - a.z), w: a.w + t*(s*b.w - a.w) }; const n = Math.hypot(r.x, r.y, r.z, r.w); return { x: r.x/n, y: r.y/n, z: r.z/n, w: r.w/n }; }
+  const th = Math.acos(d), sn = Math.sin(th), wa = Math.sin((1-t)*th)/sn, wb = s*Math.sin(t*th)/sn;
+  return { x: wa*a.x + wb*b.x, y: wa*a.y + wb*b.y, z: wa*a.z + wb*b.z, w: wa*a.w + wb*b.w };
+}
+const lerp3 = (a, b, t) => ({ x: a.x + (b.x-a.x)*t, y: a.y + (b.y-a.y)*t, z: a.z + (b.z-a.z)*t });
+
+function build(clips) {
+  // Concatenate clips into one animation:
+  //  - translation tracks missing from a clip fall back to the bind pose
+  //  - root motion: 'accumulate' re-bases each clip so its first root position continues where the previous one ended
+  //                 'in place' drops horizontal root travel
+  //  - the first BLEND frames of every clip after the first are blended from the previous clip's last pose (hides the pop)
+  const mode = $('rm').value, bind = {}; skeleton.bones.forEach((b, i) => bind[b.name] = skeleton.bindPose[i].position);
+  const rootNames = new Set(skeleton.bones.filter(b => b.parent < 0).map(b => b.name));
+  const tr = {}; let t0 = 0; segs = [];
+  const lastRoot = {};   // boneName -> last emitted root position (accumulate)
+  for (const { m, a } of clips) {
+    const an = a.animation, dt = 1 / an.fps, len = an.numFrames * dt, first = tr[Object.keys(tr)[0]] === undefined;
+    for (const t of an.tracks) {
+      const o = tr[t.boneName] ||= { boneName: t.boneName, times: [], rotations: [], positions: [], anyPos: false };
+      const isRoot = rootNames.has(t.boneName), b0 = bind[t.boneName];
+      let shift = { x: 0, z: 0 };
+      if (isRoot && t.positions) {
+        const f = t.positions[0];
+        if (mode === 'inplace') shift = { x: f.x - b0.x, z: f.z - b0.z };
+        else if (lastRoot[t.boneName]) shift = { x: f.x - lastRoot[t.boneName].x, z: f.z - lastRoot[t.boneName].z };
+      }
+      const prevRot = o.rotations[o.rotations.length - 1], prevPos = o.positions[o.positions.length - 1];
+      t.times.forEach((x, i) => {
+        let rot = t.rotations[i], p = t.positions ? t.positions[i] : b0;
+        if (isRoot && t.positions) {
+          p = { x: p.x - shift.x, y: p.y, z: p.z - shift.z };
+          if (mode === 'inplace') p = { x: b0.x, y: p.y, z: b0.z };
+        }
+        if (!first && i < BLEND && prevRot) {
+          const w = (i + 1) / (BLEND + 1); rot = slerp(prevRot, rot, w); if (prevPos) p = lerp3(prevPos, p, w);
+        }
+        o.times.push(x + t0); o.rotations.push(rot); o.positions.push(p);
+        if (t.positions) o.anyPos = true;
+        if (isRoot) lastRoot[t.boneName] = p;
+      });
+    }
+    segs.push({ m, start: t0, len, nf: an.numFrames, ph: phases(m), notifies: retimeOn() && m.Orig ? retimeNotifies(an.notifies || [], m.Orig, m.F, an.duration) : (an.notifies || []), dur: an.duration });
+    t0 += len;
+  }
+  total = t0;
+  const tracks = Object.values(tr).map(o => ({ boneName: o.boneName, times: o.times, rotations: o.rotations, positions: o.anyPos ? o.positions : undefined }));
+  return { skeleton, animation: { name: clips.map(c => c.m.Name).join(' > '), duration: total, numFrames: Math.round(total * 30), fps: 30, tracks } };
+}
+
+let current = null, lastProgress = 0;
+async function run(list, keep) {
+  current = list;
+  try {
+    const wasPlaying = playing;
+    const clips = [];
+    for (const m of list) clips.push({ m, a: await getAnim(m) });
+    const data = build(clips);
+    sendToViewer({ action: 'loadAnimation', data });
+    sendToViewer({ action: 'setSpeed', speed: +$('spd').value });
+    playing = true; $('pp').textContent = 'Pause';
+    if (keep) { sendToViewer({ action: 'seek', progress: lastProgress }); if (!wasPlaying) { playing = false; sendToViewer({ action: 'pause' }); $('pp').textContent = 'Play'; } }
+    drawBar(); const sgSel = segs.find(x => sel && x.m.Id === sel.Id) || segs[0]; if (sgSel && mode === 'solo') showSync(sgSel.m, sgSel); else if (mode === 'chain') $('sync').textContent = ''; applyToggles(); setWeapon(); if (!cameraDone) { resetCamera(); cameraDone = true; }
+  } catch (e) { console.error(e); showError(String(e)); }
+}
+
+function drawBar() {
+  const bar = $('bar'); [...bar.querySelectorAll('.seg')].forEach(n => n.remove());
+  segs.forEach((sg, i) => {
+    const d = document.createElement('div'); d.className = 'seg';
+    d.style.left = (sg.start / total * 100) + '%'; d.style.width = (sg.len / total * 100) + '%';
+    d.style.background = i % 2 ? '#1e1e2e' : '#252538';
+    const pct = f => Math.max(0, Math.min(100, f / sg.nf * 100));
+    const over = sg.ph.end > sg.nf ? ` - row timeline (${sg.ph.end}f) is longer than the clip (${sg.nf}f)` : '';
+    d.title = `${sg.m.Name}: ${sg.ph.list.map(p => `${p.k} ${p.a}-${p.b}`).join(', ')}${over}`;
+    const secPct = t => Math.max(0, Math.min(100, t / (sg.nf / 30) * 100));
+    const nts = (sg.notifies || []).map(n => {
+      const k = nkind(n), l = secPct(n.t), w = n.state ? Math.max(0.4, secPct(n.t + n.d) - l) : 0;
+      return `<div class="nt nt-${k}${n.state ? '' : ' tick'}" style="left:${l}%;${n.state ? `width:${w}%` : ''}" title="${n.name} @${fr(n.t)}f${n.state ? ' +' + fr(n.d) + 'f' : ''}"></div>`;
+    }).join('');
+    d.innerHTML = sg.ph.list.map(p => `<div class="ph ph-${p.k}" style="left:${pct(p.a)}%;width:${Math.max(0, pct(p.b) - pct(p.a))}%"></div>`).join('')
+      + nts + `<span style="top:2px">${sg.m.Name} ${arrow(sg.m)}${over ? ' ⚠' : ''}</span>`
+      + (i === 0 ? '<span class="lane-l" style="top:22px;left:3px">animation notifies</span>' : '');
+    bar.appendChild(d);
+  });
+}
+
+function showHeader(m) {
+  $('mt').textContent = `${m.Name}  (${m.Id})`;
+  $('ms').textContent = `${arrow(m)} · ${m.Anim} · XP ${m.XpToUnlock} · ${['WithBareHands','WithSword','WithWarGloves'].filter(k => m[k]).map(k => k.slice(4)).join(', ')}`;
+  $('ms').textContent += m.Status && m.Status !== 'base' ? ` · ${m.Status} in ${m.Src}` : '';
+  $('fd').innerHTML = frameLine(m) + (m.Mods && m.Mods.length ? '<br>' + badges(m) : '');
+  fillEdit(m);
+}
+function select(m) { sel = m; mode = 'solo'; renderList(); showHeader(m); run([m]); }
+
+// ---- chain ----
+function addToChain(m) { chain.push(m); renderChain(); }
+function renderChain() {
+  const el = $('chain'); el.innerHTML = ''; let bad = 0;
+  chain.forEach((m, i) => {
+    const ok = i === 0 || short(chain[i - 1].EndQuadrant) === short(m.StartQuadrant); if (!ok) bad++;
+    const c = document.createElement('div'); c.className = 'chip' + (ok ? '' : ' bad'); c.title = ok ? '' : `previous move ends ${short(chain[i-1].EndQuadrant)}, this one starts ${short(m.StartQuadrant)}`;
+    c.innerHTML = `<b>${m.Name}</b><span class="st">${arrow(m)}</span><span class="x">✕</span>`;
+    c.onclick = e => { if (e.target.className === 'x') { chain.splice(i, 1); renderChain(); } else select(m); };
+    el.appendChild(c);
+  });
+  $('chmsg').textContent = chain.length ? (bad ? `${bad} stance break(s) - red chips don't connect in-game` : 'stance chain valid') : 'Double-click a move (or press + Add) to build a chain';
+}
+$('addb').onclick = () => sel && addToChain(sel);
+$('clr').onclick = () => { chain = []; renderChain(); };
+$('playc').onclick = () => { if (chain.length) { mode = 'chain'; $('mt').textContent = 'Chain (' + chain.length + ' moves)'; $('ms').textContent = chain.map(arrow).join('  '); $('fd').textContent = ''; run(chain); } };
+
+// ---- placeholder weapons (default assets; real ones can load from paks later) ----
+let weaponObjs = [];
+// Local axis of a hand socket that points along the forearm (elbow -> hand), found from the current pose.
+function forearmAxis(side) {
+  const hand = boneMap['hand_object_' + side], arm = boneMap['lowerarm_' + side];
+  currentMesh && currentMesh.updateMatrixWorld(true);
+  const dir = new THREE.Vector3().setFromMatrixPosition(hand.matrixWorld).sub(new THREE.Vector3().setFromMatrixPosition(arm.matrixWorld)).normalize();
+  const q = new THREE.Quaternion(); hand.getWorldQuaternion(q);
+  let best = null, bd = -2;
+  for (const ax of [[1,0,0],[-1,0,0],[0,1,0],[0,-1,0],[0,0,1],[0,0,-1]]) {
+    const w = new THREE.Vector3(...ax).applyQuaternion(q), d = w.dot(dir);
+    if (d > bd) { bd = d; best = new THREE.Vector3(...ax); }
+  }
+  return best;
+}
+function setWeapon() {
+  weaponObjs.forEach(o => o.parent && o.parent.remove(o)); weaponObjs = [];
+  const kind = $('wpn').value; if (kind === 'None' || !boneMap.hand_object_r || !boneMap.lowerarm_r) return;
+  const mat = new THREE.MeshPhongMaterial({ color: kind === 'Sword' ? 0xb8c4d8 : 0x6b4a2f });
+  const add = (bone, side, len, w, h, off) => {   // box of size len along the forearm axis, offset along it
+    const ax = forearmAxis(side), m = new THREE.Mesh(new THREE.BoxGeometry(len, w, h), mat);
+    m.quaternion.setFromUnitVectors(new THREE.Vector3(1, 0, 0), ax); m.position.copy(ax).multiplyScalar(off);
+    boneMap[bone].add(m); weaponObjs.push(m);
+  };
+  if (kind === 'Sword') { add('hand_object_r', 'r', 95, 3.5, 7, 48); add('hand_object_r', 'r', 4, 3, 22, 0); }
+  else for (const s of ['r', 'l']) add('hand_object_' + s, s, 14, 9, 11, 6);   // wargloves
+}
+
+// ---- controls ----
+function applyToggles() { setSkeletonVisible($('skel').checked); setMeshVisible($('mesh').checked); }
+$('skel').onchange = $('mesh').onchange = applyToggles;
+$('rm').onchange = () => sel && (mode === 'chain' ? $('playc').click() : select(sel));
+$('wpn').onchange = setWeapon;
+$('follow').onchange = () => setFollow($('follow').checked);
+$('spd').oninput = () => sendToViewer({ action: 'setSpeed', speed: +$('spd').value });
+$('pp').onclick = () => { playing = !playing; sendToViewer({ action: playing ? 'play' : 'pause' }); $('pp').textContent = playing ? 'Pause' : 'Play'; };
+$('bar').onmousedown = e => { const r = $('bar').getBoundingClientRect(); sendToViewer({ action: 'seek', progress: (e.clientX - r.left) / r.width }); };
+['q','wp','sq','eq','srcf'].forEach(id => $(id).oninput = renderList);
+window.addEventListener('viewerEvent', e => {
+  const d = e.detail;
+  if (d.action === 'timeUpdate') { lastProgress = d.progress; $('head').style.left = (d.progress * 100) + '%'; }
+  if (d.action === 'animationLoaded') $('info').textContent = `${d.trackCount} tracks · ${d.duration.toFixed(2)}s`;
+});
+
+// ---- edit panel: change the selected move's attacks-row values, see the timeline/animation update, and send the edit to the host ----
+const EDIT = [
+  ['Timeline (frames @30)', [['m_iFrameBuildUp', 'Build-up', 'n'], ['m_iFrameStrike1', 'Strike 1', 'n'], ['m_iFrameInterStrike1', 'Inter-strike 1', 'n'], ['m_iFrameStrike2', 'Strike 2', 'n'],
+    ['m_iFrameInterStrike2', 'Inter-strike 2', 'n'], ['m_iFrameStrike3', 'Strike 3', 'n'], ['m_iFrameInterStrike3', 'Inter-strike 3', 'n'], ['m_iFrameStrike4', 'Strike 4', 'n'],
+    ['m_iFrameRelease', 'Release', 'n'], ['m_iFrameInterruptibleRelease', 'Interruptible release', 'n'], ['m_iFramePerfectRelease', 'Perfect release at', 'n'],
+    ['m_iNbFramesPerfectRelease', 'Perfect window', 'n'], ['m_iFrameCancel', 'Cancel', 'n']]],
+  ['Advantage', [['m_iAdvFrameOnPLHit', 'Hit adv (perfect link)', 'n'], ['m_iAdvFrameOnPLGuard', 'Guard adv (perfect link)', 'n'], ['m_iNbFrameStuned', 'Hit stun', 'n'], ['m_iNbFrameStunedOnGuard', 'Guard stun', 'n']]],
+  ['Hit', [['m_eHitTarget', 'Target', 's:EAttackTarget::High,EAttackTarget::Mid,EAttackTarget::Low'], ['m_eAttackPower', 'Power', 's:EAttackPowers::Light,EAttackPowers::Heavy'],
+    ['m_fDamageMax1', 'Damage (max)', 'n'], ['m_fRange', 'Range', 'n']]],
+  ['Modifiers', [['m_bIsInterruptAttack', 'Interrupt', 'b'], ['m_bCanGuardBreak', 'Guard break', 'b'], ['m_bIsDisarmAttack', 'Disarm', 'b'], ['m_bIsRushAttack', 'Rush', 'b'], ['m_bCanBeMirrored', 'Can be mirrored', 'b']]],
+  ['Animation', [['m_Anim', 'Animation', 't']]],
+];
+let filling = false, editTarget = null;
+function buildEdit() {
+  const el = $('edit'); el.innerHTML = '';
+  for (const [title, fields] of EDIT) {
+    el.insertAdjacentHTML('beforeend', `<h4>${title}</h4>`);
+    for (const [key, label, type] of fields) {
+      const f = document.createElement('div'); f.className = 'f'; f.dataset.key = key;
+      let inp;
+      if (type === 'n') inp = '<input type="number" step="any">';
+      else if (type === 'b') inp = '<input type="checkbox">';
+      else if (type === 't') inp = '<input type="text" spellcheck="false">';
+      else inp = '<select>' + type.slice(2).split(',').map(o => `<option value="${o}">${o.split('::').pop()}</option>`).join('') + '</select>';
+      f.innerHTML = `<label>${label}</label>${inp}`;
+      const input = f.querySelector('input,select');
+      input.addEventListener('change', () => { if (!filling) editField(key, type === 'b' ? input.checked : input.value); });
+      el.appendChild(f);
+    }
+  }
+  el.insertAdjacentHTML('beforeend', '<h4>Animation notifies</h4><div class="f"><label title="Edits to the timeline fields also move the animation\'s baked Phase / A.L notifies (the mod tool adds a retime-anim edit; applied when you pack)">Retime with the row</label><input type="checkbox" id="retime" checked></div>');
+  $('retime').addEventListener('change', () => {
+    if (editTarget && current) run(current, true);   // redraw the notify lane
+    if (window.chrome && window.chrome.webview) window.chrome.webview.postMessage({ action: 'retimeOption', on: $('retime').checked, id: editTarget ? editTarget.Id : '' });
+  });
+  el.insertAdjacentHTML('beforeend', '<div class="note" id="enote"></div>');
+}
+function fillEdit(m) {
+  editTarget = m; if (!$('edit').firstChild) buildEdit();
+  filling = true;
+  for (const f of $('edit').querySelectorAll('.f[data-key]')) {
+    const key = f.dataset.key, v = m.Raw ? m.Raw[key] : undefined, input = f.querySelector('input,select');
+    if (input.type === 'checkbox') input.checked = bool(v);
+    else if (input.tagName === 'SELECT') { const want = String(v ?? ''); input.value = [...input.options].some(o => o.value === want) ? want : (input.options[0] && [...input.options].find(o => o.value.endsWith('::' + strip(want)))?.value) || input.value; }
+    else input.value = v == null ? '' : String(v);
+    input.disabled = !m.Raw || (m.Status && m.Status !== 'base');
+  }
+  const fromPak = m.Status && m.Status !== 'base';
+  $('enote').textContent = fromPak ? `${m.Name} (${m.Id}) comes from ${m.Src} (${m.Status} vs the base game). Playback is live, but the Data Editor only has the base game's rows, so editing it here is switched off.` : m.Raw ? `Editing ${m.Name} (${m.Id}). Changes also go to the host's property editor / recipe when hosted in the mod tool.` : 'This move has no row data (exported-data mode): open it from the mod tool to edit.';
+  filling = false;
+}
+function editField(key, value) {
+  const m = editTarget; if (!m || !m.Raw) return;
+  applyRow(m.Id, { ...m.Raw, [key]: typeof value === 'boolean' ? (value ? 'True' : 'False') : String(value) });
+  const hostPost = window.chrome && window.chrome.webview && window.chrome.webview.postMessage;
+  if (hostPost) window.chrome.webview.postMessage({ action: 'rowEdit', id: m.Id, field: key, value: typeof value === 'boolean' ? (value ? 'True' : 'False') : String(value), retime: retimeOn() });
+  const f = $('edit').querySelector(`.f[data-key="${key}"]`); if (f) f.classList.add('chg');
+}
+// Replace one move's row everywhere (list, selection, chain, running playback) and re-render in place.
+function applyRow(id, row) {
+  const i = moves.findIndex(x => x.Id === id), m = rowToMove(id, row, i >= 0 ? moves[i].Orig : null);
+  if (i >= 0) { m.Src = moves[i].Src; m.Status = moves[i].Status; }
+  if (i >= 0) moves[i] = m; else moves.push(m);
+  if (sel && sel.Id === id) { sel = m; showHeader(m); }
+  chain = chain.map(x => x.Id === id ? m : x); renderList(); renderChain();
+  if (current && current.some(x => x.Id === id)) run(current.map(x => x.Id === id ? m : x), true);
+  return true;
+}
+$('editb').onclick = () => { const e = $('edit'); e.style.display = e.style.display === 'block' ? 'none' : 'block'; if (sel) fillEdit(sel); };
+
+// Host API
+window.viewerApi = {
+  previewMove: id => { const m = moves.find(x => x.Id === id); if (m) select(m); return !!m; },
+  playChain: ids => { chain = ids.map(id => moves.find(x => x.Id === id)).filter(Boolean); renderChain(); $('playc').click(); return chain.length; },
+  setWeapon: k => { $('wpn').value = k; setWeapon(); },
+  // Live edit from the property grid: full raw attacks row for one move. Re-renders header, phase bands and (if the
+  // anim changed) the animation, keeping the playback position and camera.
+  setRow: (id, row) => applyRow(id, row),
+};
+window.addEventListener('load', async function boot() {
+  let mesh = null;
+  try {
+    if (LIVE) {
+      try {
+        const rows = await (await fetch(LIVE + 'moves')).json();
+        moves = rows.map(r => { const m = rowToMove(r.Id, r.Row); m.Src = r.Src || 'base'; m.Status = r.Status || 'base'; return m; });
+        skeleton = await (await fetch(LIVE + 'skeleton')).json();
+        mesh = await (await fetch(LIVE + 'mesh')).json();
+        $('src').textContent = `live from paks · ${moves.length} moves`;
+      } catch (e) { console.warn('live pak source failed, using exported data', e); location.search = '?static=1'; return; }
+    } else {
+      moves = await (await fetch('data/moves.json')).json();
+      skeleton = await (await fetch('data/skeleton.json')).json();
+      try { mesh = await (await fetch('data/M_ThePlainesChara.mesh.json')).json(); } catch (e) { console.warn('no mesh', e); }
+      $('src').textContent = `exported data · ${moves.length} moves`;
+    }
+    fillSources(); renderList(); renderChain();
+    if (mesh) window.loadMesh(mesh, 'Absolver'); else $('mesh').disabled = true;
+    const q = new URLSearchParams(location.search).get('move');
+    select(moves.find(m => m.Id === q) || moves.find(m => m.Id === '004') || moves[0]);
+  } catch (e) { showError('boot failed: ' + e + ' - serve this folder over http (see serve.bat)'); }
+});
+</script>
+</body>
+</html>
